@@ -7,14 +7,12 @@ describe('loginPost', function () {
   let req, res, next;
 
   beforeEach(function () {
-    // Criando uma chain fake para req.assert()
     const validationChain = {
       isEmail: sinon.stub().returnsThis(),
       notEmpty: sinon.stub().returnsThis()
     };
 
     req = {
-      // Sempre que chamarem req.assert('algumaCoisa'), vai retornar validationChain
       assert: sinon.stub().returns(validationChain),
 
       // Saneamento
@@ -22,11 +20,9 @@ describe('loginPost', function () {
         normalizeEmail: sinon.stub()
       }),
 
-      // Validadores
       validationErrors: sinon.stub(),
       flash: sinon.stub(),
 
-      // Corpo e funções
       body: {},
       logIn: sinon.stub()
     };
@@ -38,7 +34,6 @@ describe('loginPost', function () {
     next = sinon.stub();
   });
 
-  // Restaura o stub do passport após cada teste
   afterEach(function() {
     if (passport.authenticate.restore) {
       passport.authenticate.restore();
