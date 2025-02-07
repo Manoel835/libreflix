@@ -3,6 +3,7 @@ var LocalStrategy = require('passport-local').Strategy;
 var FacebookStrategy = require('passport-facebook').Strategy;
 var TwitterStrategy = require('passport-twitter').Strategy;
 var GithubStrategy = require('passport-github').Strategy;
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
 
 var User = require('../models/User');
@@ -16,6 +17,78 @@ passport.deserializeUser(function(id, done) {
     done(err, user);
   });
 });
+
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: "/auth/google/callback"
+}, function(accessToken, refreshToken, profile, done) {
+
+  User.findOne({ googleId: profile.id }, function(err, user) {
+    if (err) return done(err);
+
+    if (user) {
+      return done(null, user);
+    }
+
+    User.findOne({ email: profile.emails[0].value }, function(err, existingUser) {
+      if (err) return done(err);
+
+      if (existingUser) {
+        existingUser.googleId = profile.id;
+        existingUser.save(function(err) {
+          return done(err, existingUser);
+        });
+      } else {
+        const baseUsername = generateUsernameFromName(profile.displayName);
+
+        generateUniqueUsername(baseUsername, function(err, uniqueUsername) {
+          if (err) return done(err);
+
+          const newUser = new User({
+            googleId: profile.id,
+            name: profile.displayName,
+            email: profile.emails[0].value,
+            username: uniqueUsername
+          });
+
+          newUser.save(function(err) {
+            if (err) return done(err);
+            return done(null, newUser);
+          });
+        });
+      }
+    });
+  });
+}));
+
+function generateUsernameFromName(displayName) {
+  return displayName
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function generateUniqueUsername(baseUsername, callback) {
+  let suffix = 0;
+  let newUsername = baseUsername;
+
+  function checkUsername() {
+    User.findOne({ username: newUsername }, function(err, user) {
+      if (err) return callback(err);
+
+      if (!user) {
+        return callback(null, newUsername);
+      }
+
+      suffix += 1;
+      newUsername = `${baseUsername}${suffix}`;
+      checkUsername();
+    });
+  }
+
+  checkUsername();
+}
 
 // Sign in with Email and Password
 passport.use(new LocalStrategy({ usernameField: 'email' }, function(email, password, done) {
